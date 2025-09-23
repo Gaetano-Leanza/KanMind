@@ -121,7 +121,7 @@
             <section id="edit_board_dialog" current_dialog="false" dialog-type="board_settings" class="current_dialog dialog card d_flex_ss_gl f_d_c std_form w_full" onmousedown="stopProp(event)" onclick="stopProp(event)">
                 <header class="card_header_w_btn">
                     <h2 class="font_prime_color">Board Settings</h2>
-                    <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast()" class="close_btn"><img
+                    <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast(); resetCurrentDialogs()" class="close_btn"><img
                             src="../../assets/icons/close_white.svg" alt=""></button>
                 </header>
                 <article edit="false" class="w_full" id="board_settings_title_group">
@@ -220,14 +220,14 @@
                     <p class="error_label">Title must be at least 3 characters long.</p>
                 </div>
                 <div class="form_group_wo_icon_w_label d_flex_ss_gs f_d_c w_full">
-                    <label class="label_required" for="create_edit_task_description ">Description</label>
+                    <label class="label_required" for="create_edit_task_description">Description</label>
                     <textarea class="w_full" placeholder="Write a description..." type="text"
                         id="create_edit_task_description" required></textarea>
                 </div>
 
                 <section class="d_flex_cs_gm w_full dropdown_section">
                     <div class="dropdown w_full">
-                        <p class="dropdown_title font_white_color label_required" >Assignee</p>
+                        <p class="dropdown_title label_required font_white_color">Assignee</p>
                         <div class="dropdown_toggle" onclick="toggleDropdown(this, event)">
                             <div class="dropdown_choosen_element" id="create_edit_task_assignee_head">
                                 <img src="../../assets/icons/face_icon.svg" alt="">
@@ -314,7 +314,7 @@
                         <button onclick="openEditTaskDialog()" class="close_btn d_flex_cc_gs">
                             <img src="../../assets/icons/edit.svg" alt="">
                         </button>
-                        <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast()" class="close_btn d_flex_cc_gs">
+                        <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast(); resetCurrentDialogs()" class="close_btn d_flex_cc_gs">
                             <img src="../../assets/icons/close_white.svg" alt="">
                         </button>
                     </div>

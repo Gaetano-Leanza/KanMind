@@ -56,7 +56,7 @@
         </section>
 
 
-        <section onmousedown="toggleOpenId('dialog_wrapper'); deleteLastingToast()" open="false" current-dialog="board_settings" onclick="stopProp(event)"
+        <section onmousedown="toggleOpenId('dialog_wrapper'); deleteLastingToast(); resetCurrentDialogs()" open="false" current-dialog="board_settings" onclick="stopProp(event)"
             id="dialog_wrapper" class="dialog_wrapper pad_l">
             <form onmousedown="stopProp(event)" dialog-type="board_create" onsubmit="boardCreateSubmit(event)"
                 class="current_dialog card d_flex_ss_gl f_d_c std_form w_full" action=""
@@ -109,7 +109,7 @@
                 action="" onclick="stopProp(event)">
                 <header class="card_header_w_btn">
                     <h2 class="font_prime_color">Board Settings</h2>
-                    <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast()" class="close_btn"><img
+                    <button onclick="toggleOpenId('dialog_wrapper'); deleteLastingToast(); resetCurrentDialogs()" class="close_btn"><img
                             src="../../assets/icons/close_white.svg" alt=""></button>
                 </header>
                 <article edit="false" class="w_full" id="board_settings_title_group">
