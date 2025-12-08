@@ -135,8 +135,11 @@ function getSingleTaskTemplate(task) {
 }
 
 function redirectToBoardWTask(taskId){
-    let task = currentAssignedTickets.find(task => task.id == taskId)
-    window.location.href = `../../pages/board/?id=${task.board}&task_id=${task.id}`
+    let taskList = currenTaskFilter == "review" ? currentReviewerTickets : currentAssignedTickets;
+    let task = taskList.find(task => task.id == taskId);
+    if(task) {
+        window.location.href = `../../pages/board/?id=${task.board}&task_id=${task.id}`;
+    }
 }
 
 function renderMemberAndTaskCount(){
