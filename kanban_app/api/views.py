@@ -33,3 +33,52 @@ class LoginView(APIView):
         return Response({
             "error": "Ungültige Anfragedaten."
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegistrationView(APIView):
+    """
+    Erstellt einen neuen Benutzer basierend auf der API-Dokumentation.
+    Entspricht exakt der Vorgabe: POST /api/registration/
+    """
+    def post(self, request):
+        data = request.data
+        fullname = data.get('fullname', '')
+        email = data.get('email')
+        password = data.get('password')
+        repeated_password = data.get('repeated_password')
+
+        # 1. Validierung der Eingaben
+        if not email or not password or not fullname:
+            return Response({"error": "Bitte füllen Sie alle Felder aus."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if password != repeated_password:
+            return Response({"error": "Passwörter stimmen nicht überein."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Diese Email ist bereits registriert."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Namen für das Django-Modell aufteilen (First Name / Last Name)
+        name_parts = fullname.split(' ', 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+        # 3. User-Objekt erstellen
+        # Wir nutzen die Email als Username, da Django ein Username-Feld erzwingt
+        user = User.objects.create_user(
+            username=email, 
+            email=email, 
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        # 4. Token für den neuen User generieren
+        token, created = Token.get_or_create(user=user)
+
+        # 5. Erfolgsantwort gemäß Screenshot
+        return Response({
+            "token": token.key,
+            "fullname": fullname,
+            "email": user.email,
+            "user_id": user.id
+        }, status=status.HTTP_201_CREATED)
