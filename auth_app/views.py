@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 
 
 class RegistrationView(APIView):
+
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):

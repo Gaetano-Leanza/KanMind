@@ -1,59 +1,56 @@
-from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from rest_framework import status
-from rest_framework.authtoken.models import Token
-from rest_framework.response import Response
+from rest_framework import permissions, status
 from rest_framework.views import APIView
-
-from .serializers import LoginSerializer, RegistrationSerializer
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 
 
 class RegistrationView(APIView):
-    """Erstellt einen neuen Benutzer und liefert einen Token zurück."""
+
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = RegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = self._create_user(serializer.validated_data)
-            return self._get_auth_response(user, status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        email = request.data.get('email')
+        password = request.data.get('password')
+        repeated_password = request.data.get('repeated_password')
+        fullname = request.data.get('fullname')
 
-    def _create_user(self, data):
-        name_parts = data['fullname'].split(' ', 1)
-        return User.objects.create_user(
-            username=data['email'],
-            email=data['email'],
-            password=data['password'],
-            first_name=name_parts[0],
-            last_name=name_parts[1] if len(name_parts) > 1 else ""
-        )
+        if password != repeated_password:
+            return Response({'error': 'Passwörter stimmen nicht überein.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    def _get_auth_response(self, user, status_code):
-        token, _ = Token.get_or_create(user=user)
+        if User.objects.filter(username=email).exists():
+            return Response({'error': 'Ein User mit dieser E-Mail existiert bereits.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(
+            username=email, email=email, password=password)
+        user.first_name = fullname
+        user.save()
+        token, created = Token.objects.get_or_create(user=user)
+
         return Response({
-            "token": token.key,
-            "fullname": f"{user.first_name} {user.last_name}".strip(),
-            "email": user.email,
-            "user_id": user.id
-        }, status=status_code)
+            'token': token.key,
+            'user_id': user.pk,
+            'email': user.email,
+            'fullname': user.first_name
+        }, status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
-    """Authentifiziert den User und gibt Token zurück."""
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        email = request.data.get('email')
+        password = request.data.get('password')
+        user = authenticate(username=email, password=password)
 
-        user = self._authenticate_email(serializer.validated_data)
         if user:
-            return RegistrationView()._get_auth_response(user, status.HTTP_200_OK)
-        return Response({"error": "Ungültige Login-Daten"}, status=status.HTTP_400_BAD_REQUEST)
-
-    def _authenticate_email(self, data):
-        try:
-            user_obj = User.objects.get(email=data['email'])
-            return authenticate(username=user_obj.username, password=data['password'])
-        except User.DoesNotExist:
-            return None
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({
+                'token': token.key,
+                'user_id': user.pk,
+                'email': user.email,
+                'fullname': f"{user.first_name} {user.last_name}".strip()
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Ungültige Anmeldedaten'}, status=status.HTTP_401_UNAUTHORIZED)
