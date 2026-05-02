@@ -1,38 +1,22 @@
-# KanMind Frontend Project
+# KannMind Backend
 
-![KanMind Logo](assets/icons/logo_icon.svg)
+This is the Django-based REST API for the KannMind Task Management System.
 
-Dieses Projekt ist ein einfaches Frontend, das mit **Vanilla JavaScript** (reines JavaScript ohne Frameworks) erstellt wurde. Es wurde speziell entwickelt, um Schülern der **Developer Akademie** mit Backend-Erfahrung den Einstieg in kleinere Frontend-Anpassungen zu erleichtern.
+## Features
+- **Authentication**: Custom login and registration via `auth_app`.
+- **Project Boards**: Create and manage Kanban boards with participants.
+- **Task Management**: CRUD operations for tasks including status updates and priorities.
+- **Comments**: Chronological task notes with ownership protection.
 
----
+## Installation & Setup
+1. **Clone the repository**
+2. **Create a virtual environment**: `python -m venv venv`
+3. **Activate venv**: `.\venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Mac/Linux)
+4. **Install dependencies**: `pip install -r requirements.txt`
+5. **Run migrations**: `python manage.py migrate`
+6. **Start server**: `python manage.py runserver`
 
-## Voraussetzungen
-
-- Ein funktionierendes Django-Backend (`KanMind`), das **nicht** in diesem Projekt enthalten ist.
-- Visual Studio Code mit der **Live Server**-Erweiterung oder eine ähnliche Möglichkeit, die `index.html` auf oberster Ebene lokal im Browser zu starten.
-
----
-
-## Nutzung
-
-1. Stelle sicher, dass das Backend `KanMind` läuft.
-2. Öffne dieses Projekt in **Visual Studio Code**.
-3. Rechtsklicke auf die Datei `index.html` auf oberster Ebene und wähle **Open with Live Server**, um das Projekt zu starten.
-
----
-
-## Ziel des Projekts
-
-Dieses Frontend wurde bewusst mit **Vanilla JavaScript** erstellt, um die folgenden Ziele zu erreichen:
-
-- **Einfacher Einstieg**: Durch den Verzicht auf Frameworks wie React oder Angular bleibt der Code leicht verständlich und nachvollziehbar auch bei wenig Frontend-Erfahrung.
-- **Lernen durch Anpassung**: Schüler können den Code anpassen, um kleine Änderungen vorzunehmen und Frontend-Konzepte besser zu verstehen.
-- **Backend-Erweiterung**: Das Projekt lässt sich einfach an das bestehende Django-Backend `KanMind` anbinden.
-
----
-
-## Hinweis
-
-Dieses Projekt ist **ausschließlich für Schüler der Developer Akademie** gedacht und nicht zur freien Nutzung oder Weitergabe freigegeben.
-
----
+## Tech Stack
+- Python / Django
+- Django Rest Framework (DRF)
+- Token Authentication
