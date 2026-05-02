@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from ..models import ProjectBoard, KanbanTask
+from ..models import ProjectBoard, KanbanTask, TaskNote
 
 
 class UserMinimalSerializer(serializers.ModelSerializer):
@@ -14,6 +14,21 @@ class UserMinimalSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
 
 
+class TaskNoteSerializer(serializers.ModelSerializer):
+    """ Serializer für Kommentare gemäß image_04ead4.png """
+    author = serializers.SerializerMethodField()
+    content = serializers.CharField(source='message')
+    created_at = serializers.DateTimeField(
+        source='posted_at', format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
+
+    class Meta:
+        model = TaskNote
+        fields = ['id', 'created_at', 'author', 'content']
+
+    def get_author(self, obj):
+        return f"{obj.writer.first_name} {obj.writer.last_name}".strip() or obj.writer.username
+
+
 class KanbanTaskSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='label')
     description = serializers.CharField(source='info_text', allow_blank=True)
@@ -22,12 +37,25 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
     assignee = UserMinimalSerializer(source='worker', read_only=True)
     reviewer = UserMinimalSerializer(read_only=True)
     due_date = serializers.DateTimeField(source='deadline', format="%Y-%m-%d")
+    comments_count = serializers.IntegerField(
+        source='notes.count', read_only=True)
+
+    assignee_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='worker', write_only=True, required=False, allow_null=True
+    )
+    reviewer_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='reviewer', write_only=True, required=False, allow_null=True
+    )
+    board = serializers.PrimaryKeyRelatedField(
+        queryset=ProjectBoard.objects.all(), source='parent_board', required=False
+    )
 
     class Meta:
         model = KanbanTask
         fields = [
-            'id', 'title', 'description', 'status', 'priority',
-            'assignee', 'reviewer', 'due_date'
+            'id', 'board', 'title', 'description', 'status', 'priority',
+            'assignee', 'assignee_id', 'reviewer', 'reviewer_id',
+            'due_date', 'comments_count'
         ]
 
     def get_priority(self, obj):

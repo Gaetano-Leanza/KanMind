@@ -2,11 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, permissions
 from rest_framework.authtoken.models import Token
+from rest_framework.decorators import action
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db.models import Q
-from ..models import ProjectBoard
-from .serializers import BoardSerializer
+from django.shortcuts import get_object_or_404
+from ..models import ProjectBoard, KanbanTask, TaskNote
+from .serializers import BoardSerializer, KanbanTaskSerializer, TaskNoteSerializer
 
 
 class LoginView(APIView):
@@ -102,8 +104,56 @@ class BoardViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
+class TaskViewSet(viewsets.ModelViewSet):
+    """
+    Verwaltet alle Task-Aktionen inkl. spezieller Filter und Kommentare.
+    """
+    serializer_class = KanbanTaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = KanbanTask.objects.all()
+
+    @action(detail=False, methods=['get'], url_path='assigned-to-me')
+    def assigned_to_me(self, request):
+        tasks = KanbanTask.objects.filter(worker=request.user)
+        serializer = self.get_serializer(tasks, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='reviewing')
+    def reviewing(self, request):
+        tasks = KanbanTask.objects.filter(reviewer=request.user)
+        serializer = self.get_serializer(tasks, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get', 'post'])
+    def comments(self, request, pk=None):
+        task = self.get_object()
+        
+        if request.method == 'GET':
+            notes = task.notes.all().order_by('posted_at')
+            serializer = TaskNoteSerializer(notes, many=True)
+            return Response(serializer.data)
+
+        if request.method == 'POST':
+            serializer = TaskNoteSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(writer=request.user, parent_task=task)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[^/.]+)')
+    def delete_comment(self, request, pk=None, comment_id=None):
+        task = self.get_object()
+        comment = get_object_or_404(TaskNote, id=comment_id, parent_task=task)
+        
+        if comment.writer != request.user:
+            return Response({"error": "Nur der Ersteller kann den Kommentar löschen."}, status=status.HTTP_403_FORBIDDEN)
+        
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class EmailCheckView(APIView):
-    """ Prüft, ob eine Email existiert und gibt User-Daten zurück (image_20f15d.png). """
+    """ Prüft, ob eine Email existiert und gibt User-Daten zurück. """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
