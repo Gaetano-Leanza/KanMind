@@ -13,12 +13,26 @@ class RegistrationSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def validate(self, data):
+
         if data['password'] != data['repeated_password']:
             raise serializers.ValidationError(
-                "Passwörter stimmen nicht überein.")
+                {"repeated_password": "Passwörter stimmen nicht überein."})
+
         if User.objects.filter(email=data['email']).exists():
-            raise serializers.ValidationError("Email bereits registriert.")
+            raise serializers.ValidationError(
+                {"email": "Email bereits registriert."})
+
         return data
+
+    def create(self, validated_data):
+        """Erstellt den User und mappt die Frontend-Felder auf Django-Felder."""
+        user = User.objects.create_user(
+            username=validated_data['email'],
+            email=validated_data['email'],
+            password=validated_data['password'],
+            first_name=validated_data.get('fullname', '')
+        )
+        return user
 
 
 class LoginSerializer(serializers.Serializer):
