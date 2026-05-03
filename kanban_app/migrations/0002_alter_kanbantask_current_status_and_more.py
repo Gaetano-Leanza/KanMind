@@ -6,13 +6,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """
+    Migration to update field metadata.
+    Adds descriptive 'verbose_name' attributes to all models (KanbanTask, ProjectBoard, TaskNote)
+    to improve readability in the Django Admin interface.
+    """
 
+    # Linking to the previous initial migration
     dependencies = [
         ('kanban_app', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
+        # --- Updates for KanbanTask Fields ---
         migrations.AlterField(
             model_name='kanbantask',
             name='current_status',
@@ -53,6 +60,8 @@ class Migration(migrations.Migration):
             name='worker',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='tasks_todo', to=settings.AUTH_USER_MODEL, verbose_name='Bearbeiter'),
         ),
+
+        # --- Updates for ProjectBoard Fields ---
         migrations.AlterField(
             model_name='projectboard',
             name='creator',
@@ -78,6 +87,8 @@ class Migration(migrations.Migration):
             name='timestamp',
             field=models.DateTimeField(auto_now_add=True, verbose_name='Erstellt am'),
         ),
+
+        # --- Updates for TaskNote Fields ---
         migrations.AlterField(
             model_name='tasknote',
             name='message',
