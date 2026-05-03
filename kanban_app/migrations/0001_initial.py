@@ -4,16 +4,21 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-
 class Migration(migrations.Migration):
+    """
+    Initial migration for the kanban_app.
+    Creates the database schema for ProjectBoard, KanbanTask, and TaskNote models.
+    """
 
     initial = True
 
+    # Dependencies: Links this migration to the built-in Django Auth system
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
+        # --- Create ProjectBoard Table ---
         migrations.CreateModel(
             name='ProjectBoard',
             fields=[
@@ -30,6 +35,7 @@ class Migration(migrations.Migration):
                 'ordering': ['-timestamp'],
             },
         ),
+        # --- Create KanbanTask Table ---
         migrations.CreateModel(
             name='KanbanTask',
             fields=[
@@ -49,6 +55,7 @@ class Migration(migrations.Migration):
                 'ordering': ['deadline', 'priority_level'],
             },
         ),
+        # --- Create TaskNote Table ---
         migrations.CreateModel(
             name='TaskNote',
             fields=[
