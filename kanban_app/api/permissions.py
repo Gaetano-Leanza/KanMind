@@ -1,29 +1,29 @@
 from rest_framework.permissions import BasePermission
-from kanban_app.models import Board,Task
+from kanban_app.models import Board, Task
 
-
+# --- Board Level Permissions ---
 
 class IsBoardMemberOrOwner(BasePermission):
     """
-    Allows access if the user is either the owner of the object
-    or a member of the associated board.
+    Permission to allow access if the user is either the owner 
+    of the object or a verified member of the associated board.
     """
     def has_object_permission(self, request, view, obj):
+        # Checks for direct ownership or presence in the members list
         return request.user == obj.owner or request.user in obj.members.all()
 
 
 class IsBoardMember(BasePermission):
     """
-    Combined permission for accessing boards.
-    Checks both general access rights (e.g., POST requests with board specified)
-    and object-level permissions on board objects.
+    Comprehensive permission for board access.
+    Validates both general request data (has_permission) and 
+    specific database objects (has_object_permission).
     """
 
     def has_permission(self, request, view):
         """
-        Checks if the user has access to the specified board,
-        based on 'board' in the request data or query parameters.
-        If no board is specified, access is not restricted.
+        Validates access based on the 'board' ID provided in query params or request body.
+        If no board is specified, the request passes to the next check.
         """
         board_id = request.data.get('board') or request.query_params.get('board')
         if not board_id:
@@ -34,37 +34,42 @@ class IsBoardMember(BasePermission):
         except Board.DoesNotExist:
             return False
 
+        # Access only for the owner or board members
         return request.user == board.owner or request.user in board.members.all()
 
     def has_object_permission(self, request, view, obj):
         """
-        Checks access to a board object.
-        If the object is a child object with a 'board' attribute,
-        the board is determined and membership/ownership checked.
+        Ensures the user belongs to the specific board object being accessed.
+        Automatically resolves the board if the object is a child (e.g., a Task).
         """
         board = obj.board if hasattr(obj, "board") else obj
         return request.user == board.owner or request.user in board.members.all()
 
 
+# --- Task & Comment Level Permissions ---
+
 class IsTaskCreatorOrBoardOwner(BasePermission):
     """
-    Allows actions (e.g., deletion) only to the creator of the task
-    or the owner of the associated board.
+    Restrictive permission for sensitive actions like deletion.
+    Only the task creator or the overall board owner are authorized.
     """
 
     def has_object_permission(self, request, view, obj):
         user = request.user
+        # Logic: Board owners should always be able to moderate content on their board
         return user == obj.owner or user == obj.board.owner
 
 
 class IsBoardMemberForTask(BasePermission):
     """
-    Allows access only to members of the board linked to a task or comment.
+    Permission that ensures a user belongs to the parent board 
+    before they can interact with specific tasks or comments.
     """
 
     def has_object_permission(self, request, view, obj):
         user = request.user
 
+        # Determine the parent board depending on the object type
         if hasattr(obj, 'task'):
             board = obj.task.board
         elif hasattr(obj, 'board'):
@@ -72,12 +77,13 @@ class IsBoardMemberForTask(BasePermission):
         else:
             return False
 
+        # Check for ownership or membership via ID for performance
         return user.id == board.owner.id or board.members.filter(id=user.id).exists()
 
 
 class IsCommentAuthor(BasePermission):
     """
-    Allows actions only to the author of the comment.
+    Strict permission to ensure only the original author can edit or delete a comment.
     """
 
     def has_object_permission(self, request, view, obj):
