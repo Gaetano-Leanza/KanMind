@@ -19,5 +19,5 @@ urlpatterns = [
 
     # Kanban Board API endpoints (Boards, Tasks, etc.)
     # Routes to the sub-routing defined in kanban_app.api.urls
-    path('kanban/', include('kanban_app.api.urls')),
+    path('api/kanban/', include('kanban_app.api.urls')),
 ]
