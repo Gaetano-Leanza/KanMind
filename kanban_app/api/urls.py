@@ -1,19 +1,19 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import BoardViewSet, TaskViewSet, EmailCheckView
+from .views import BoardViewSet, TaskViewSet 
+# EmailCheckView hier entfernen, da er jetzt in der auth_app lebt
 
 # --- Router Configuration ---
-# The DefaultRouter automatically generates URL patterns for the ViewSets.
-# It creates endpoints for standard actions like list, create, retrieve, update, and destroy.
 router = DefaultRouter()
+# Erzeugt die Endpunkte: /api/kanban/boards/ und /api/kanban/tasks/
 router.register(r'boards', BoardViewSet, basename='boards')
 router.register(r'tasks', TaskViewSet, basename='tasks')
 
 # --- API URL Patterns ---
 urlpatterns = [
-    # Include all router-generated URLs (e.g., /api/boards/, /api/tasks/)
+    # Bindet die Router-URLs ein
     path('', include(router.urls)),
-
-    # Custom APIView for utility functions (Email validation)
-    path('email-check/', EmailCheckView.as_view(), name='kanban-email-check'),
+    
+    # Der Email-Check Pfad wurde hier entfernt, 
+    # da er nun zentral über die auth_app unter /api/email-check/ läuft.
 ]

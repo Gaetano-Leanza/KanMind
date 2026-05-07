@@ -2,6 +2,7 @@ from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 
 # --- User Authentication & Registration ---
@@ -28,14 +29,14 @@ class RegistrationView(APIView):
         # 1. Validation: Check if passwords match
         if password != repeated_password:
             return Response(
-                {'error': 'Passwörter stimmen nicht überein.'}, 
+                {'error': 'Passwords do not match.'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # 2. Validation: Ensure the email (used as username) is unique
         if User.objects.filter(username=email).exists():
             return Response(
-                {'error': 'Ein User mit dieser E-Mail existiert bereits.'}, 
+                {'error': 'A user with this email already exists.'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -55,3 +56,73 @@ class RegistrationView(APIView):
             'email': user.email,
             'fullname': user.first_name
         }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    """
+    Handles user login by authenticating credentials and returning a token.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        """
+        Validates credentials and returns an auth token if successful.
+        """
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        user = authenticate(username=username, password=password)
+        
+        if user:
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({
+                'token': token.key,
+                'user_id': user.pk,
+                'email': user.email,
+                'fullname': user.first_name
+            }, status=status.HTTP_200_OK)
+        
+        return Response(
+            {'error': 'Invalid credentials.'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+# --- Utility Views ---
+
+class EmailCheckView(APIView):
+    """
+    Checks if a user with a specific email address exists in the database.
+    Used by the frontend to validate members before adding them to a board.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        """
+        Handles GET requests to check for email existence via query parameters.
+        Example: /api/email-check/?email=test@example.com
+        """
+        email = request.query_params.get('email')
+
+        if not email:
+            return Response(
+                {'error': 'No email address provided.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user exists (using email as the username)
+        user_exists = User.objects.filter(username=email).exists()
+
+        if user_exists:
+            user = User.objects.get(username=email)
+            return Response({
+                'exists': True,
+                'email': user.email,
+                'fullname': user.first_name
+            }, status=status.HTTP_200_OK)
+        else:
+            # Return 404 to trigger the "User doesn't exist" error in the frontend
+            return Response(
+                {'exists': False, 'error': "This email adress doesn't exist."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )

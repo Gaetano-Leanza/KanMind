@@ -1,15 +1,10 @@
 from django.urls import path
-from .views import LoginView, RegistrationView
-
-# --- Authentication URL Routing ---
-# This file maps specific URL endpoints to the authentication logic.
-# These paths are typically included in the main project's URL configuration.
+from .views import RegistrationView, LoginView, EmailCheckView # Stelle sicher, dass EmailCheckView hier importiert ist
 
 urlpatterns = [
-    # Endpoint for user login: Expects credentials and returns a token
-    path('auth/login/', LoginView.as_view(), name='auth-login'),
+    path('registration/', RegistrationView.as_view(), name='registration'),
+    path('login/', LoginView.as_view(), name='login'),
     
-    # Endpoint for user registration: Handles new account creation
-    path('auth/registration/', RegistrationView.as_view(),
-         name='auth-registration'),
+    # Diesen Pfad hinzufügen, damit /api/email-check/ funktioniert:
+    path('email-check/', EmailCheckView.as_view(), name='email-check'),
 ]

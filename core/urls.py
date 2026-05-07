@@ -8,16 +8,17 @@ from django.contrib import admin
 from django.urls import path, include
 
 # --- Main URL Patterns ---
-# This list defines the entry points for the different modules of the application.
+# Diese Liste definiert die Einstiegspunkte für deine API-Module.
 urlpatterns = [
-    # Administrative interface provided by Django
+    # Administrations-Interface
     path('admin/', admin.site.urls),
 
-    # Authentication API endpoints (Login, Registration, etc.)
-    # Routes to the sub-routing defined in auth_app.api.urls
+    # Authentication API endpoints (Login, Registration, Email-Check)
+    # Erwartet im Frontend: /api/email-check/
     path('api/', include('auth_app.api.urls')),
 
     # Kanban Board API endpoints (Boards, Tasks, etc.)
-    # Routes to the sub-routing defined in kanban_app.api.urls
+    # Erwartet im Frontend: /api/kanban/boards/
+    # Wir fügen hier 'api/' davor ein, damit es zum Frontend passt
     path('api/kanban/', include('kanban_app.api.urls')),
 ]
