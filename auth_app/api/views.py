@@ -25,11 +25,11 @@ class RegistrationView(APIView):
 
         # Validation: Password confirmation check
         if password != repeated_password:
-            return Response({'password': ['Passwörter stimmen nicht überein.']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'password': ['Passwords do not match.']}, status=status.HTTP_400_BAD_REQUEST)
 
         # Validation: Check if email (used as username) is already taken
         if User.objects.filter(username=email).exists():
-            return Response({'email': ['Ein User mit dieser E-Mail existiert bereits.']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'email': ['A user with this email already exists.']}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create user object and assign full name to first_name field
         user = User.objects.create_user(
@@ -78,4 +78,24 @@ class LoginView(APIView):
             }, status=status.HTTP_200_OK)
         else:
             # Returns a 401 status if credentials do not match
-            return Response({'non_field_errors': ['Ungültige Anmeldedaten']}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'non_field_errors': ['Invalid credentials']}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class EmailCheckView(APIView):
+    """
+    Checks if an email is already registered in the system.
+    Useful for real-time validation during the sign-up process.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        """
+        Receives an email and returns a boolean indicating if it exists.
+        """
+        email = request.data.get('email')
+        # Check if a user with the provided email (username) exists in the database
+        exists = User.objects.filter(username=email).exists()
+        
+        return Response({
+            'exists': exists
+        }, status=status.HTTP_200_OK)
