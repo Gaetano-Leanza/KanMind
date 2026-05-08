@@ -16,5 +16,4 @@ urlpatterns = [
     path('api/auth/', include('auth_app.api.urls')),
 
     # Kanban Board API endpoints (Boards, Tasks, etc.)
-    path('api/kanban/', include('kanban_app.api.urls')),
-]
+    path('api/', include('kanban_app.api.urls')),]

@@ -50,6 +50,21 @@ class TaskViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     queryset = KanbanTask.objects.all()
 
+    def perform_create(self, serializer):
+        """
+        Fixes the IntegrityError by ensuring the parent_board is set.
+        It looks for 'parent_board' or 'parent_board_id' in the request data.
+        """
+        board_id = self.request.data.get('parent_board') or self.request.data.get('parent_board_id')
+        
+        if board_id:
+            # We fetch the actual board object to ensure it exists
+            board = get_object_or_404(ProjectBoard, id=board_id)
+            serializer.save(parent_board=board)
+        else:
+            # If no board ID is provided, we let the serializer validation handle it
+            serializer.save()
+
     @action(detail=False, methods=['get'], url_path='assigned-to-me')
     def assigned_to_me(self, request):
         """Lists all tasks where the current user is assigned as the worker."""
