@@ -83,22 +83,30 @@ class LoginView(APIView):
 
 class EmailCheckView(APIView):
     """
-    Checks if an email is already registered in the system.
-    Useful for real-time validation during the sign-up or member-add process.
+    Checks if an email is already registered and returns user details.
     """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         """
-        Handles GET requests to check if a user exists by email.
-        The email is expected as a query parameter (e.g., ?email=user@example.com).
+        Handles GET requests to check if a user exists and returns their profile.
         """
-        # Retrieve the email from query parameters instead of request body
         email = request.query_params.get('email')
         
-        # Check if a user with the provided email (username) exists in the database
-        exists = User.objects.filter(username=email).exists()
-        
-        return Response({
-            'exists': exists
-        }, status=status.HTTP_200_OK)
+        try:
+            # We search for the user by email
+            user = User.objects.get(username=email)
+            
+            # If found, we return the data the frontend needs for the "Added members" list
+            return Response({
+                'exists': True,
+                'id': user.id,
+                'email': user.email,
+                'fullname': f"{user.first_name}".strip() or user.username
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            # If not found, we just return that it doesn't exist
+            return Response({
+                'exists': False
+            }, status=status.HTTP_200_OK)
