@@ -7,13 +7,14 @@ The `urlpatterns` list routes URLs to views. For more information please see:
 from django.contrib import admin
 from django.urls import path, include
 
-# --- Main URL Patterns ---
 urlpatterns = [
     # Administrations-Interface
     path('admin/', admin.site.urls),
 
-    # Authentication API endpoints (Login, Registration, Email-Check)
-    path('api/auth/', include('auth_app.api.urls')),
+    # Authentication & Registration API endpoints
+    # Diese eine Zeile reicht für registration, login und email-check!
+    path('api/', include('auth_app.api.urls')),
 
-    # Kanban Board API endpoints (Boards, Tasks, etc.)
-    path('api/', include('kanban_app.api.urls')),]
+    # Kanban Board API endpoints
+    path('api/', include('kanban_app.api.urls')),
+]
