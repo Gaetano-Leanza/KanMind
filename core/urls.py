@@ -12,7 +12,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Authentication & Registration API endpoints
-    # Diese eine Zeile reicht für registration, login und email-check!
     path('api/', include('auth_app.api.urls')),
 
     # Kanban Board API endpoints

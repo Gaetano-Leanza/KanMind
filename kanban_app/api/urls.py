@@ -7,6 +7,8 @@ The `urlpatterns` list routes URLs to views. For more information please see:
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+
+from auth_app.api.views import RegistrationView
 from .views import BoardViewSet, TaskViewSet
 
 # --- Router Configuration ---
@@ -17,6 +19,6 @@ router.register(r'tasks', TaskViewSet, basename='tasks')
 
 # --- API URL Patterns ---
 urlpatterns = [
-    # This includes all routes registered above (e.g., /boards/, /tasks/)
     path('', include(router.urls)),
+    path('registration/', RegistrationView.as_view(), name='registration'),
 ]
