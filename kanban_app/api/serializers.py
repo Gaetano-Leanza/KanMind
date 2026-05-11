@@ -81,10 +81,16 @@ class BoardSerializer(serializers.ModelSerializer):
     """
     title = serializers.CharField(source='name')
     
-    # Fix: These names (owner_data, members_data) are likely what the test expects
     owner_id = serializers.ReadOnlyField(source='creator.id')
     owner_data = UserMinimalSerializer(source='creator', read_only=True)
+    
+    # Anzeige der Mitglieder als Objekte
     members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
+    
+    # Erlaubt das Senden von IDs beim POST/PATCH
+    participants = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(), write_only=True, required=False
+    )
     
     tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
     
@@ -96,27 +102,37 @@ class BoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectBoard
         fields = [
-            'id', 'title', 'owner_id', 'owner_data', 'members_data', 'tasks',
+            'id', 'title', 'owner_id', 'owner_data', 'members_data', 'participants', 'tasks',
             'member_count', 'ticket_count', 'tasks_to_do_count', 'tasks_high_prio_count'
         ]
 
+    def create(self, validated_data):
+        """Sorgt dafür, dass Mitglieder beim Erstellen gespeichert werden."""
+        participants = validated_data.pop('participants', [])
+        board = ProjectBoard.objects.create(**validated_data)
+        if participants:
+            board.participants.set(participants)
+        return board
+
+    def update(self, instance, validated_data):
+        """Sorgt dafür, dass Mitglieder beim Bearbeiten (PATCH) aktualisiert werden."""
+        participants = validated_data.pop('participants', None)
+        instance = super().update(instance, validated_data)
+        if participants is not None:
+            instance.participants.set(participants)
+        return instance
+
     def get_tasks_to_do_count(self, obj):
-        # Maps 'bk' (backlog) or 'to-do' to the counter
         return obj.all_tasks.filter(current_status__in=['bk', 'to-do']).count()
 
     def get_tasks_high_prio_count(self, obj):
         return obj.all_tasks.filter(priority_level__gte=3).count()
 
 
-class BoardUpdateResponseSerializer(serializers.ModelSerializer):
+class BoardUpdateResponseSerializer(BoardSerializer):
     """
-    Specific serializer for the UpdateBot/Canary Property tests.
-    Ensures that PATCH/PUT responses return full objects.
+    Nutzt jetzt die Logik des Haupt-Serializers, 
+    um sicherzustellen, dass PATCH-Antworten identisch sind.
     """
-    title = serializers.CharField(source='name')
-    owner_data = UserMinimalSerializer(source='creator', read_only=True)
-    members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
-
-    class Meta:
-        model = ProjectBoard
+    class Meta(BoardSerializer.Meta):
         fields = ['id', 'title', 'owner_data', 'members_data']
