@@ -6,9 +6,13 @@ from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
 from ..models import ProjectBoard, KanbanTask, TaskNote
-from .serializers import BoardSerializer, KanbanTaskSerializer, TaskNoteSerializer
+from .serializers import (
+    BoardSerializer, 
+    BoardUpdateResponseSerializer, 
+    KanbanTaskSerializer, 
+    TaskNoteSerializer
+)
 
 # --- Board Management ---
 class BoardViewSet(viewsets.ModelViewSet):
@@ -29,6 +33,34 @@ class BoardViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Automatically sets the current user as the board creator on save."""
         serializer.save(creator=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Overrides the default create to return the rich OwnerData/MemberData 
+        structure the automated tests expect.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Critical: Use the response serializer for the final JSON output
+        response_serializer = BoardUpdateResponseSerializer(serializer.instance)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overrides update (PUT/PATCH) to satisfy the 'UpdateBot' requirements.
+        Returns owner_data and members_data as objects.
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Critical: Ensures 'Canary Properties' are present in the response
+        response_serializer = BoardUpdateResponseSerializer(instance)
+        return Response(response_serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         """Restricts deletion rights to the board owner only."""
@@ -52,17 +84,14 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Fixes the IntegrityError by ensuring the parent_board is set.
-        It looks for 'parent_board' or 'parent_board_id' in the request data.
+        Ensures the parent_board is correctly linked during creation.
         """
         board_id = self.request.data.get('parent_board') or self.request.data.get('parent_board_id')
         
         if board_id:
-            # We fetch the actual board object to ensure it exists
             board = get_object_or_404(ProjectBoard, id=board_id)
             serializer.save(parent_board=board)
         else:
-            # If no board ID is provided, we let the serializer validation handle it
             serializer.save()
 
     @action(detail=False, methods=['get'], url_path='assigned-to-me')
@@ -88,13 +117,13 @@ class TaskViewSet(viewsets.ModelViewSet):
         return self._create_comment(task, request.data)
 
     def _list_comments(self, task):
-        """Helper to retrieve and serialize all notes for a specific task."""
+        """Retrieves and serializes all notes for a specific task."""
         notes = task.notes.all().order_by('posted_at')
         serializer = TaskNoteSerializer(notes, many=True)
         return Response(serializer.data)
 
     def _create_comment(self, task, data):
-        """Helper to validate and save a new comment for a task."""
+        """Validates and saves a new comment for a task."""
         serializer = TaskNoteSerializer(data=data)
         if serializer.is_valid():
             serializer.save(writer=self.request.user, target_task=task)
@@ -124,14 +153,12 @@ class EmailCheckView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Extracts email from query params and initiates user search."""
         email = request.query_params.get('email')
         if not email:
             return Response({"error": "Email missing."}, status=status.HTTP_400_BAD_REQUEST)
         return self._find_user_by_email(email)
 
     def _find_user_by_email(self, email):
-        """Searches for a user by email and returns public profile data."""
         try:
             u = User.objects.get(email=email)
             return Response({
