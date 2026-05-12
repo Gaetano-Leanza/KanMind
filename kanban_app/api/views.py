@@ -13,22 +13,34 @@ from .serializers import (
     KanbanTaskSerializer, 
     TaskNoteSerializer
 )
-
+from .permissions import IsBoardMemberOrOwner
 # --- Board Management ---
+
 class BoardViewSet(viewsets.ModelViewSet):
     """
     Handles all board actions including member-specific queries.
-    Ensures users only see boards they are involved in.
+    Ensures users only see boards they are involved in or throws 403.
     """
     serializer_class = BoardSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # WICHTIG: IsMemberOrOwner muss in deinen permissions.py definiert sein
+    permission_classes = [permissions.IsAuthenticated, IsBoardMemberOrOwner]
 
     def get_queryset(self):
-        """Returns boards where the user is either the creator or a participant."""
+        """
+        Returns boards based on action. 
+        Filters list view, but allows all for detail view to trigger 403 instead of 404.
+        """
         user = self.request.user
-        return ProjectBoard.objects.filter(
-            Q(creator=user) | Q(participants=user)
-        ).distinct()
+        
+        # Wenn nur die Liste abgefragt wird, filtern wir hart
+        if self.action == 'list':
+            return ProjectBoard.objects.filter(
+                Q(creator=user) | Q(participants=user)
+            ).distinct()
+        
+        # Für detail, update, destroy geben wir alles zurück, 
+        # damit die Permission-Klasse die 403 Prüfung machen kann.
+        return ProjectBoard.objects.all()
 
     def perform_create(self, serializer):
         """Automatically sets the current user as the board creator on save."""
@@ -43,14 +55,13 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         
-        # Critical: Use the response serializer for the final JSON output
         response_serializer = BoardUpdateResponseSerializer(serializer.instance)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         """
         Overrides update (PUT/PATCH) to satisfy the 'UpdateBot' requirements.
-        Returns owner_data and members_data as objects.
+        Returns owner_data and members as objects.
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -58,20 +69,21 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        # Critical: Ensures 'Canary Properties' are present in the response
         response_serializer = BoardUpdateResponseSerializer(instance)
         return Response(response_serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        """Restricts deletion rights to the board owner only."""
+        """
+        Restricts deletion rights to the board owner only.
+        The 403 here is now handled via the Permission Class or this explicit check.
+        """
         instance = self.get_object()
         if instance.creator != request.user:
             return Response(
-                {"error": "Only the owner can delete this board."},
+                {"detail": "You do not have permission to delete this board."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
-
 
 # --- Task & Comment Management ---
 class TaskViewSet(viewsets.ModelViewSet):

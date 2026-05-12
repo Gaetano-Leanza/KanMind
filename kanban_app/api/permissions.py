@@ -1,16 +1,16 @@
 from rest_framework.permissions import BasePermission
-from kanban_app.models import Board, Task
-
+from kanban_app.models import ProjectBoard, KanbanTask
 # --- Board Level Permissions ---
+
 
 class IsBoardMemberOrOwner(BasePermission):
     """
     Permission to allow access if the user is either the owner 
     of the object or a verified member of the associated board.
     """
+
     def has_object_permission(self, request, view, obj):
-        # Checks for direct ownership or presence in the members list
-        return request.user == obj.owner or request.user in obj.members.all()
+        return request.user == obj.creator or request.user in obj.participants.all()
 
 
 class IsBoardMember(BasePermission):
@@ -25,17 +25,18 @@ class IsBoardMember(BasePermission):
         Validates access based on the 'board' ID provided in query params or request body.
         If no board is specified, the request passes to the next check.
         """
-        board_id = request.data.get('board') or request.query_params.get('board')
+        board_id = request.data.get(
+            'board') or request.query_params.get('board')
         if not board_id:
-            return True 
+            return True
 
         try:
-            board = Board.objects.get(id=board_id)
-        except Board.DoesNotExist:
+            board = ProjectBoard.objects.get(id=board_id)
+        except ProjectBoard.DoesNotExist:
             return False
 
         # Access only for the owner or board members
-        return request.user == board.owner or request.user in board.members.all()
+        return request.user == board.creator or request.user in board.participants.all()
 
     def has_object_permission(self, request, view, obj):
         """
@@ -43,10 +44,10 @@ class IsBoardMember(BasePermission):
         Automatically resolves the board if the object is a child (e.g., a Task).
         """
         board = obj.board if hasattr(obj, "board") else obj
-        return request.user == board.owner or request.user in board.members.all()
-
+        return request.user == board.creator or request.user in board.participants.all()
 
 # --- Task & Comment Level Permissions ---
+
 
 class IsTaskCreatorOrBoardOwner(BasePermission):
     """
