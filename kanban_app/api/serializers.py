@@ -4,6 +4,7 @@ from ..models import ProjectBoard, KanbanTask, TaskNote
 
 # --- Helper Serializers ---
 
+
 class UserMinimalSerializer(serializers.ModelSerializer):
     """
     Serializer providing the full 'OwnerData' and 'MemberData' objects.
@@ -43,11 +44,12 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
     description = serializers.CharField(source='info_text', allow_blank=True)
     status = serializers.CharField(source='current_status')
     priority = serializers.SerializerMethodField()
-    
+
     assignee = UserMinimalSerializer(source='worker', read_only=True)
     reviewer = UserMinimalSerializer(read_only=True)
     due_date = serializers.DateTimeField(source='deadline', format="%Y-%m-%d")
-    comments_count = serializers.IntegerField(source='notes.count', read_only=True)
+    comments_count = serializers.IntegerField(
+        source='notes.count', read_only=True)
 
     assignee_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source='worker', write_only=True, required=False, allow_null=True
@@ -71,8 +73,8 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
         priorities = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'}
         return priorities.get(obj.priority_level, 'medium')
 
-
 # --- Board Serialization ---
+
 
 class BoardSerializer(serializers.ModelSerializer):
     """
@@ -80,29 +82,30 @@ class BoardSerializer(serializers.ModelSerializer):
     Includes aggregated stats and nested owner/member data.
     """
     title = serializers.CharField(source='name')
-    
+
     owner_id = serializers.ReadOnlyField(source='creator.id')
     owner_data = UserMinimalSerializer(source='creator', read_only=True)
-    
-    # Anzeige der Mitglieder als Objekte
-    members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
-    
-    # Erlaubt das Senden von IDs beim POST/PATCH
+
+    members = UserMinimalSerializer(
+        source='participants', many=True, read_only=True)
+
     participants = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(), write_only=True, required=False
     )
-    
+
     tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
-    
-    member_count = serializers.IntegerField(source='participants.count', read_only=True)
-    ticket_count = serializers.IntegerField(source='all_tasks.count', read_only=True)
+
+    member_count = serializers.IntegerField(
+        source='participants.count', read_only=True)
+    ticket_count = serializers.IntegerField(
+        source='all_tasks.count', read_only=True)
     tasks_to_do_count = serializers.SerializerMethodField()
     tasks_high_prio_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectBoard
         fields = [
-            'id', 'title', 'owner_id', 'owner_data', 'members_data', 'participants', 'tasks',
+            'id', 'title', 'owner_id', 'owner_data', 'members', 'participants', 'tasks',
             'member_count', 'ticket_count', 'tasks_to_do_count', 'tasks_high_prio_count'
         ]
 
@@ -130,9 +133,6 @@ class BoardSerializer(serializers.ModelSerializer):
 
 
 class BoardUpdateResponseSerializer(BoardSerializer):
-    """
-    Nutzt jetzt die Logik des Haupt-Serializers, 
-    um sicherzustellen, dass PATCH-Antworten identisch sind.
-    """
+
     class Meta(BoardSerializer.Meta):
-        fields = ['id', 'title', 'owner_data', 'members_data']
+        fields = ['id', 'title', 'owner_data', 'members']
