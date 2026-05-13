@@ -8,13 +8,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import ProjectBoard, KanbanTask, TaskNote
 from .serializers import (
-    BoardSerializer, 
-    BoardUpdateResponseSerializer, 
-    KanbanTaskSerializer, 
+    BoardSerializer,
+    BoardUpdateResponseSerializer,
+    KanbanTaskSerializer,
     TaskNoteSerializer
 )
 from .permissions import IsBoardMemberOrOwner
 # --- Board Management ---
+
 
 class BoardViewSet(viewsets.ModelViewSet):
     """
@@ -22,7 +23,6 @@ class BoardViewSet(viewsets.ModelViewSet):
     Ensures users only see boards they are involved in or throws 403.
     """
     serializer_class = BoardSerializer
-    # WICHTIG: IsMemberOrOwner muss in deinen permissions.py definiert sein
     permission_classes = [permissions.IsAuthenticated, IsBoardMemberOrOwner]
 
     def get_queryset(self):
@@ -31,15 +31,12 @@ class BoardViewSet(viewsets.ModelViewSet):
         Filters list view, but allows all for detail view to trigger 403 instead of 404.
         """
         user = self.request.user
-        
-        # Wenn nur die Liste abgefragt wird, filtern wir hart
+
         if self.action == 'list':
             return ProjectBoard.objects.filter(
                 Q(creator=user) | Q(participants=user)
             ).distinct()
-        
-        # Für detail, update, destroy geben wir alles zurück, 
-        # damit die Permission-Klasse die 403 Prüfung machen kann.
+
         return ProjectBoard.objects.all()
 
     def perform_create(self, serializer):
@@ -54,8 +51,9 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        
-        response_serializer = BoardUpdateResponseSerializer(serializer.instance)
+
+        response_serializer = BoardUpdateResponseSerializer(
+            serializer.instance)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -65,7 +63,8 @@ class BoardViewSet(viewsets.ModelViewSet):
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
@@ -86,6 +85,7 @@ class BoardViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 # --- Task & Comment Management ---
+
 class TaskViewSet(viewsets.ModelViewSet):
     """
     Manages tasks, assignments, and associated comments (TaskNotes).
@@ -98,18 +98,45 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         Ensures the parent_board is correctly linked during creation.
         """
-        board_id = self.request.data.get('parent_board') or self.request.data.get('parent_board_id')
-        
+        board_id = self.request.data.get(
+            'parent_board') or self.request.data.get('parent_board_id')
+
         if board_id:
             board = get_object_or_404(ProjectBoard, id=board_id)
             serializer.save(parent_board=board)
         else:
             serializer.save()
 
+    def perform_update(self, serializer):
+        """
+        Validates that the parent_board cannot be changed during an update.
+        Matches the requirement: "Das ändern der Board-Id(board) ist nicht erlaubt!"
+        """
+        # Wir prüfen, ob eine Board-ID im Request gesendet wurde
+        new_board_id = self.request.data.get('parent_board') or self.request.data.get('board')
+        
+        if new_board_id is not None:
+            instance = self.get_object()
+            # Vergleich der gesendeten ID mit der aktuellen ID in der Datenbank
+            if int(new_board_id) != instance.parent_board.id:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "board": "Das Ändern der Board-Id(board) ist nicht erlaubt!"
+                })
+        
+        serializer.save()
+
     @action(detail=False, methods=['get'], url_path='assigned-to-me')
     def assigned_to_me(self, request):
-        """Lists all tasks where the current user is assigned as the worker."""
-        tasks = KanbanTask.objects.filter(worker=request.user)
+        """
+        Lists all tasks where the current user is either the worker or the reviewer.
+        """
+        from django.db.models import Q
+        user = request.user
+        tasks = KanbanTask.objects.filter(
+            Q(worker=user) | Q(reviewer=user)
+        ).distinct()
+
         serializer = self.get_serializer(tasks, many=True)
         return Response(serializer.data)
 
@@ -155,8 +182,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             )
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
+    
 # --- Utility Views ---
 class EmailCheckView(APIView):
     """
@@ -167,16 +193,17 @@ class EmailCheckView(APIView):
     def get(self, request):
         email = request.query_params.get('email')
         if not email:
-            return Response({"error": "Email missing."}, status=status.HTTP_400_BAD_REQUEST)
-        return self._find_user_by_email(email)
+            # Die Dokumentation nutzt oft "detail" statt "error" bei Standard-DRF-Fehlern
+            return Response({"detail": "Email missing."}, status=status.HTTP_400_BAD_REQUEST)
 
-    def _find_user_by_email(self, email):
         try:
             u = User.objects.get(email=email)
             return Response({
                 "id": u.id,
                 "email": u.email,
+                # Wir nutzen hier die gleiche Logik wie in deinem UserMinimalSerializer
                 "fullname": f"{u.first_name} {u.last_name}".strip() or u.username
-            })
+            }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            # Wichtig für den 404-Nachweis in deiner Doku
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)

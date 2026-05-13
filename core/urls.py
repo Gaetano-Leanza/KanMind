@@ -11,9 +11,9 @@ urlpatterns = [
     # Administrations-Interface
     path('admin/', admin.site.urls),
 
-    # Authentication & Registration API endpoints
-    path('api/', include('auth_app.api.urls')),
-
     # Kanban Board API endpoints
     path('api/', include('kanban_app.api.urls')),
+
+    # Authentication & Registration API endpoints
+    path('api/', include('auth_app.api.urls')),
 ]

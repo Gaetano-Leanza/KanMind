@@ -9,7 +9,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from auth_app.api.views import RegistrationView
-from .views import BoardViewSet, TaskViewSet
+from .views import BoardViewSet, EmailCheckView, TaskViewSet
 
 # --- Router Configuration ---
 # The DefaultRouter automatically creates the endpoints for your viewsets.
@@ -21,4 +21,5 @@ router.register(r'tasks', TaskViewSet, basename='tasks')
 urlpatterns = [
     path('', include(router.urls)),
     path('registration/', RegistrationView.as_view(), name='registration'),
+    path('email-check/', EmailCheckView.as_view(), name='email-check'),
 ]
