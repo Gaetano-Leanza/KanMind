@@ -22,12 +22,15 @@ class IsBoardMember(BasePermission):
 
     def has_permission(self, request, view):
         """
-        Validates access based on the 'board' ID provided in query params or request body.
+        Validates access based on the 'parent_board' ID provided in query params or request body.
         If no board is specified, the request passes to the next check.
         """
+        # Adjusted to use 'parent_board' to match your KanbanTask model
         board_id = request.data.get(
-            'board') or request.query_params.get('board')
+            'parent_board') or request.query_params.get('parent_board')
+
         if not board_id:
+            # Allow access to lists or generic views; object-level permission will handle the rest
             return True
 
         try:
@@ -35,16 +38,20 @@ class IsBoardMember(BasePermission):
         except ProjectBoard.DoesNotExist:
             return False
 
-        # Access only for the owner or board members
+        # Access only for the creator or users listed in participants
         return request.user == board.creator or request.user in board.participants.all()
 
     def has_object_permission(self, request, view, obj):
         """
         Ensures the user belongs to the specific board object being accessed.
-        Automatically resolves the board if the object is a child (e.g., a Task).
+        Automatically resolves the board if the object is a child (e.g., a KanbanTask).
         """
-        board = obj.board if hasattr(obj, "board") else obj
+        # Adjusted to check for 'parent_board' attribute based on your KanbanTask model
+        board = obj.parent_board if hasattr(obj, "parent_board") else obj
+
+        # Access only for the creator or users listed in participants
         return request.user == board.creator or request.user in board.participants.all()
+
 
 # --- Task & Comment Level Permissions ---
 

@@ -14,6 +14,8 @@ from .serializers import (
     TaskNoteSerializer
 )
 from .permissions import IsBoardMemberOrOwner
+from .permissions import IsBoardMember
+from rest_framework.exceptions import PermissionDenied
 # --- Board Management ---
 
 
@@ -89,20 +91,27 @@ class BoardViewSet(viewsets.ModelViewSet):
 class TaskViewSet(viewsets.ModelViewSet):
     """
     Manages tasks, assignments, and associated comments (TaskNotes).
+    Integrates board-level permission checks to ensure data security.
     """
     serializer_class = KanbanTaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # Added IsBoardMember to enforce access control based on board membership
+    permission_classes = [permissions.IsAuthenticated, IsBoardMember]
     queryset = KanbanTask.objects.all()
 
     def perform_create(self, serializer):
         """
-        Ensures the parent_board is correctly linked during creation.
+        Ensures the parent_board is correctly linked and validates user membership.
+        Throws 403 Forbidden if the user is not a participant or creator of the board.
         """
-        board_id = self.request.data.get(
-            'parent_board') or self.request.data.get('parent_board_id')
+        board_id = self.request.data.get('parent_board') or self.request.data.get('board')
 
         if board_id:
             board = get_object_or_404(ProjectBoard, id=board_id)
+            
+            # Explicit membership check to trigger 403 Forbidden for unauthorized users
+            if self.request.user != board.creator and self.request.user not in board.participants.all():
+                raise PermissionDenied("You do not have permission to create tasks in this board.")
+                
             serializer.save(parent_board=board)
         else:
             serializer.save()
@@ -110,18 +119,17 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """
         Validates that the parent_board cannot be changed during an update.
-        Matches the requirement: "Das ändern der Board-Id(board) ist nicht erlaubt!"
+        Ensures consistency of task-to-board relationships.
         """
-        # Wir prüfen, ob eine Board-ID im Request gesendet wurde
+        # Check if a board ID was provided in the request
         new_board_id = self.request.data.get('parent_board') or self.request.data.get('board')
         
         if new_board_id is not None:
             instance = self.get_object()
-            # Vergleich der gesendeten ID mit der aktuellen ID in der Datenbank
+            # Compare requested board ID with the current board ID in the database
             if int(new_board_id) != instance.parent_board.id:
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    "board": "Das Ändern der Board-Id(board) ist nicht erlaubt!"
+                    "board": "Changing the board ID is not allowed!"
                 })
         
         serializer.save()
@@ -129,9 +137,8 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='assigned-to-me')
     def assigned_to_me(self, request):
         """
-        Lists all tasks where the current user is either the worker or the reviewer.
+        Lists all tasks where the current user is assigned as worker or reviewer.
         """
-        from django.db.models import Q
         user = request.user
         tasks = KanbanTask.objects.filter(
             Q(worker=user) | Q(reviewer=user)
@@ -142,27 +149,35 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='reviewing')
     def reviewing(self, request):
-        """Lists all tasks where the current user is assigned as the reviewer."""
+        """
+        Lists all tasks where the current user is assigned specifically as a reviewer.
+        """
         tasks = KanbanTask.objects.filter(reviewer=request.user)
         serializer = self.get_serializer(tasks, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get', 'post'])
     def comments(self, request, pk=None):
-        """Dispatches comment requests to list or create methods."""
+        """
+        Dispatches comment requests to retrieve or create notes for a specific task.
+        """
         task = self.get_object()
         if request.method == 'GET':
             return self._list_comments(task)
         return self._create_comment(task, request.data)
 
     def _list_comments(self, task):
-        """Retrieves and serializes all notes for a specific task."""
+        """
+        Retrieves and serializes all notes associated with a specific task.
+        """
         notes = task.notes.all().order_by('posted_at')
         serializer = TaskNoteSerializer(notes, many=True)
         return Response(serializer.data)
 
     def _create_comment(self, task, data):
-        """Validates and saves a new comment for a task."""
+        """
+        Validates and saves a new comment, linking it to the task and the current user.
+        """
         serializer = TaskNoteSerializer(data=data)
         if serializer.is_valid():
             serializer.save(writer=self.request.user, target_task=task)
@@ -171,7 +186,9 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[^/.]+)')
     def delete_comment(self, request, pk=None, comment_id=None):
-        """Deletes a comment if the requesting user is the original author."""
+        """
+        Deletes a specific comment only if the requesting user is the original author.
+        """
         task = self.get_object()
         comment = get_object_or_404(TaskNote, id=comment_id, target_task=task)
 
