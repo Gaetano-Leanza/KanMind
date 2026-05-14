@@ -187,3 +187,14 @@ class BoardUpdateResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectBoard
         fields = ['id', 'title', 'owner_data', 'members_data']
+        
+class BoardDetailSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(source='name')
+    owner_id = serializers.ReadOnlyField(source='creator.id')
+    # The test explicitly looks for 'members', not 'members_data'
+    members = UserMinimalSerializer(source='participants', many=True, read_only=True)
+    tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
+
+    class Meta:
+        model = ProjectBoard
+        fields = ['id', 'title', 'owner_id', 'members', 'tasks']
