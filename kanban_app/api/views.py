@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import ProjectBoard, KanbanTask, TaskNote
 from .serializers import (
+    BoardDetailSerializer,
     BoardSerializer,
     BoardUpdateResponseSerializer,
     KanbanTaskSerializer,
@@ -40,6 +41,12 @@ class BoardViewSet(viewsets.ModelViewSet):
             ).distinct()
 
         return ProjectBoard.objects.all()
+
+    def get_serializer_class(self):
+        # Use the detailed version for a single board, otherwise the flat one
+        if self.action == 'retrieve':
+            return BoardDetailSerializer
+        return BoardSerializer
 
     def perform_create(self, serializer):
         """Automatically sets the current user as the board creator on save."""

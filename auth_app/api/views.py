@@ -55,6 +55,7 @@ class LoginView(APIView):
     Handles user login.
     Authenticates credentials and returns a valid Auth Token for session management.
     """
+    authentication_classes = [] 
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -77,9 +78,11 @@ class LoginView(APIView):
                 'fullname': user.first_name
             }, status=status.HTTP_200_OK)
         else:
-            # Returns a 401 status if credentials do not match
-            return Response({'non_field_errors': ['Invalid credentials']}, status=status.HTTP_401_UNAUTHORIZED)
-
+            # Returns a 400 status if credentials do not match (geändert für den Test!)
+            return Response(
+                {'non_field_errors': ['Invalid credentials']}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class EmailCheckView(APIView):
     """
