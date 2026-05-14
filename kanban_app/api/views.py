@@ -46,23 +46,16 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.save(creator=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        """
-        Overrides the default create to return the rich OwnerData/MemberData 
-        structure the automated tests expect.
-        """
+       
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
-        response_serializer = BoardUpdateResponseSerializer(
-            serializer.instance)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-
+        # Use the standard serializer.data to ensure the flat response format
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     def update(self, request, *args, **kwargs):
-        """
-        Overrides update (PUT/PATCH) to satisfy the 'UpdateBot' requirements.
-        Returns owner_data and members as objects.
-        """
+      
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(
@@ -70,8 +63,8 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        response_serializer = BoardUpdateResponseSerializer(instance)
-        return Response(response_serializer.data)
+        # Return serializer.data to match the required documentation format
+        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         """

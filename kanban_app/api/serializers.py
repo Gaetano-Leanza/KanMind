@@ -110,17 +110,14 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
 
 class BoardSerializer(serializers.ModelSerializer):
     """
-    Standard serializer for Boards, including aggregated stats and nested lists.
-
-    Combines primary board data with related tasks, membership info,
-    and computed counts for total tickets, status distribution, and
-    priority levels.
+    Refactored serializer to match the flat structure required by automated tests.
+    Includes title mapping and specific task/member counters.
     """
+    # Mapping 'name' from model to 'title' for the response
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
-    owner_data = UserMinimalSerializer(source='creator', read_only=True)
-    members_data = UserMinimalSerializer(
-        source='participants', many=True, read_only=True)
+    
+    # Write-only field to handle participant IDs during POST/PATCH
     members = serializers.PrimaryKeyRelatedField(
         source='participants',
         many=True,
@@ -129,31 +126,38 @@ class BoardSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
-    member_count = serializers.IntegerField(
-        source='participants.count', read_only=True)
-    ticket_count = serializers.IntegerField(
-        source='all_tasks.count', read_only=True)
-
+    # Computed counts for the Success Response
+    member_count = serializers.SerializerMethodField()
+    ticket_count = serializers.SerializerMethodField()
     tasks_to_do_count = serializers.SerializerMethodField()
     tasks_high_prio_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectBoard
         fields = [
-            'id', 'title', 'owner_id', 'owner_data', 'members_data',
-            'members',
-            'tasks', 'member_count', 'ticket_count',
-            'tasks_to_do_count', 'tasks_high_prio_count'
+            'id', 'title', 'member_count', 'ticket_count',
+            'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id', 'members'
         ]
 
-    def create(self, validated_data):
-        """
-        Creates a new board and handles the nested participant relationships.
+    def get_member_count(self, obj):
+        """Returns the number of participants in the board."""
+        return obj.participants.count()
 
-        Pops the participants from validated_data before model creation
-        and then sets them using the many-to-many manager.
-        """
+    def get_ticket_count(self, obj):
+        """Returns total count of all tasks associated with this board."""
+        return obj.all_tasks.count()
+
+    def get_tasks_to_do_count(self, obj):
+        """Counts tasks that are in 'Backlog' (bk) or 'To-Do' status."""
+        # Ensure status codes match your choices in models.py
+        return obj.all_tasks.filter(current_status__in=['bk', 'to-do']).count()
+
+    def get_tasks_high_prio_count(self, obj):
+        """Counts tasks with High (3) or Critical (4) priority."""
+        return obj.all_tasks.filter(priority_level__gte=3).count()
+
+    def create(self, validated_data):
+        """Handles board creation and many-to-many participant links."""
         participants = validated_data.pop('participants', [])
         board = ProjectBoard.objects.create(**validated_data)
         if participants:
@@ -161,26 +165,12 @@ class BoardSerializer(serializers.ModelSerializer):
         return board
 
     def update(self, instance, validated_data):
-        """
-        Updates an existing board instance and handles the related participants.
-
-        Extracts participants and calls the parent update method before
-        synchronizing the many-to-many relationship.
-        """
+        """Handles board updates and synchronization of participants."""
         participants = validated_data.pop('participants', None)
         instance = super().update(instance, validated_data)
         if participants is not None:
             instance.participants.set(participants)
         return instance
-
-    def get_tasks_to_do_count(self, obj):
-        """Calculates the count of tasks with statuses in the 'To-Do' list."""
-        return obj.all_tasks.filter(current_status__in=['bk', 'to-do']).count()
-
-    def get_tasks_high_prio_count(self, obj):
-        """Calculates the count of tasks with priority level 3 or higher."""
-        return obj.all_tasks.filter(priority_level__gte=3).count()
-
 
 class BoardUpdateResponseSerializer(serializers.ModelSerializer):
     """
