@@ -111,11 +111,15 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
 class BoardSerializer(serializers.ModelSerializer):
     """
     Refactored serializer to match the flat structure required by automated tests.
-    Includes title mapping and specific task/member counters.
+    Includes title mapping, specific task/member counters, and full user objects.
     """
     # Mapping 'name' from model to 'title' for the response
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
+    
+    # NEU: Hier nutzen wir deinen perfekten UserMinimalSerializer für die geforderten Objekte!
+    owner_data = UserMinimalSerializer(source='creator', read_only=True)
+    members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
     
     # Write-only field to handle participant IDs during POST/PATCH
     members = serializers.PrimaryKeyRelatedField(
@@ -136,7 +140,8 @@ class BoardSerializer(serializers.ModelSerializer):
         model = ProjectBoard
         fields = [
             'id', 'title', 'member_count', 'ticket_count',
-            'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id', 'members'
+            'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id', 'members',
+            'owner_data', 'members_data' # NEU: Hier in die fields-Liste eingefügt!
         ]
 
     def get_member_count(self, obj):
@@ -149,7 +154,6 @@ class BoardSerializer(serializers.ModelSerializer):
 
     def get_tasks_to_do_count(self, obj):
         """Counts tasks that are in 'Backlog' (bk) or 'To-Do' status."""
-        # Ensure status codes match your choices in models.py
         return obj.all_tasks.filter(current_status__in=['bk', 'to-do']).count()
 
     def get_tasks_high_prio_count(self, obj):

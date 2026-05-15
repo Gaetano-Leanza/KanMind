@@ -62,16 +62,17 @@ class BoardViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def update(self, request, *args, **kwargs):
-      
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        # Return serializer.data to match the required documentation format
-        return Response(serializer.data)
+        response_serializer = BoardUpdateResponseSerializer(instance)
+
+        return Response(response_serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         """
