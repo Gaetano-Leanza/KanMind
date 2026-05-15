@@ -11,6 +11,25 @@ from django.contrib.auth.models import User
 from ..models import ProjectBoard, KanbanTask, TaskNote
 
 
+class PriorityField(serializers.Field):
+    """
+    Übersetzt die Integer aus der Datenbank in Strings für das Frontend
+    und Strings vom Frontend zurück in Integer für die Datenbank.
+    """
+
+    def to_representation(self, value):
+        
+        priorities = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'}
+        return priorities.get(value, 'medium')
+
+    def to_internal_value(self, data):
+        
+        priorities_inv = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+        if data not in priorities_inv:
+            raise serializers.ValidationError(f"Invalid priority: {data}")
+        return priorities_inv[data]
+
+
 class UserMinimalSerializer(serializers.ModelSerializer):
     """
     Serializer providing a streamlined representation of User objects.
@@ -116,11 +135,12 @@ class BoardSerializer(serializers.ModelSerializer):
     # Mapping 'name' from model to 'title' for the response
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
-    
+
     # NEU: Hier nutzen wir deinen perfekten UserMinimalSerializer für die geforderten Objekte!
     owner_data = UserMinimalSerializer(source='creator', read_only=True)
-    members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
-    
+    members_data = UserMinimalSerializer(
+        source='participants', many=True, read_only=True)
+
     # Write-only field to handle participant IDs during POST/PATCH
     members = serializers.PrimaryKeyRelatedField(
         source='participants',
@@ -141,7 +161,7 @@ class BoardSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'member_count', 'ticket_count',
             'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id', 'members',
-            'owner_data', 'members_data' # NEU: Hier in die fields-Liste eingefügt!
+            'owner_data', 'members_data'
         ]
 
     def get_member_count(self, obj):
@@ -176,6 +196,7 @@ class BoardSerializer(serializers.ModelSerializer):
             instance.participants.set(participants)
         return instance
 
+
 class BoardUpdateResponseSerializer(serializers.ModelSerializer):
     """
     Simplified response serializer used after a successful board update.
@@ -186,17 +207,20 @@ class BoardUpdateResponseSerializer(serializers.ModelSerializer):
     """
     title = serializers.CharField(source='name')
     owner_data = UserMinimalSerializer(source='creator', read_only=True)
-    members_data = UserMinimalSerializer(source='participants', many=True, read_only=True)
+    members_data = UserMinimalSerializer(
+        source='participants', many=True, read_only=True)
 
     class Meta:
         model = ProjectBoard
         fields = ['id', 'title', 'owner_data', 'members_data']
-        
+
+
 class BoardDetailSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
     # The test explicitly looks for 'members', not 'members_data'
-    members = UserMinimalSerializer(source='participants', many=True, read_only=True)
+    members = UserMinimalSerializer(
+        source='participants', many=True, read_only=True)
     tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
 
     class Meta:
