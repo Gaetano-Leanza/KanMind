@@ -18,12 +18,12 @@ class PriorityField(serializers.Field):
     """
 
     def to_representation(self, value):
-        
+
         priorities = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'}
         return priorities.get(value, 'medium')
 
     def to_internal_value(self, data):
-        
+
         priorities_inv = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
         if data not in priorities_inv:
             raise serializers.ValidationError(f"Invalid priority: {data}")
@@ -91,7 +91,9 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='label')
     description = serializers.CharField(source='info_text', allow_blank=True)
     status = serializers.CharField(source='current_status')
-    priority = serializers.SerializerMethodField()
+
+    # NEU: Hier nutzen wir jetzt unser Custom Field statt dem SerializerMethodField
+    priority = PriorityField(source='priority_level', required=False)
 
     assignee = UserMinimalSerializer(source='worker', read_only=True)
     reviewer = UserMinimalSerializer(read_only=True)
@@ -116,15 +118,6 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
             'assignee', 'assignee_id', 'reviewer', 'reviewer_id',
             'due_date', 'comments_count'
         ]
-
-    def get_priority(self, obj):
-        """
-        Converts the integer priority_level into a descriptive string.
-
-        Defaults to 'medium' if the numerical value is unexpected.
-        """
-        priorities = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'}
-        return priorities.get(obj.priority_level, 'medium')
 
 
 class BoardSerializer(serializers.ModelSerializer):
