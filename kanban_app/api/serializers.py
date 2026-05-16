@@ -91,10 +91,7 @@ class KanbanTaskSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='label')
     description = serializers.CharField(source='info_text', allow_blank=True)
     status = serializers.CharField(source='current_status')
-
-    # NEU: Hier nutzen wir jetzt unser Custom Field statt dem SerializerMethodField
     priority = PriorityField(source='priority_level', required=False)
-
     assignee = UserMinimalSerializer(source='worker', read_only=True)
     reviewer = UserMinimalSerializer(read_only=True)
     due_date = serializers.DateTimeField(source='deadline', format="%Y-%m-%d")
@@ -125,11 +122,9 @@ class BoardSerializer(serializers.ModelSerializer):
     Refactored serializer to match the flat structure required by automated tests.
     Includes title mapping, specific task/member counters, and full user objects.
     """
-    # Mapping 'name' from model to 'title' for the response
+   
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
-
-    # NEU: Hier nutzen wir deinen perfekten UserMinimalSerializer für die geforderten Objekte!
     owner_data = UserMinimalSerializer(source='creator', read_only=True)
     members_data = UserMinimalSerializer(
         source='participants', many=True, read_only=True)
@@ -211,7 +206,6 @@ class BoardUpdateResponseSerializer(serializers.ModelSerializer):
 class BoardDetailSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='name')
     owner_id = serializers.ReadOnlyField(source='creator.id')
-    # The test explicitly looks for 'members', not 'members_data'
     members = UserMinimalSerializer(
         source='participants', many=True, read_only=True)
     tasks = KanbanTaskSerializer(source='all_tasks', many=True, read_only=True)
