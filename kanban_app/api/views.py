@@ -6,6 +6,9 @@ from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.http import Http404
+
 from ..models import ProjectBoard, KanbanTask, TaskNote
 from .serializers import (
     BoardDetailSerializer,
@@ -16,9 +19,9 @@ from .serializers import (
 )
 from .permissions import IsBoardMemberOrOwner
 from .permissions import IsBoardMember
-from rest_framework.exceptions import PermissionDenied
-# --- Board Management ---
 
+
+# --- Board Management ---
 
 class BoardViewSet(viewsets.ModelViewSet):
     """
@@ -43,7 +46,10 @@ class BoardViewSet(viewsets.ModelViewSet):
         return ProjectBoard.objects.all()
 
     def get_serializer_class(self):
-        # Use the detailed version for a single board, otherwise the flat one
+        """
+        Dynamically assigns the correct serializer based on the request action.
+        Uses a detailed serializer for single retrievals and a flat one for listing.
+        """
         if self.action == 'retrieve':
             return BoardDetailSerializer
         return BoardSerializer
@@ -53,18 +59,23 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.save(creator=self.request.user)
 
     def create(self, request, *args, **kwargs):
-       
+        """
+        Creates a new board and returns the response in a flat JSON structure.
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
-        # Use the standard serializer.data to ensure the flat response format
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
+
     def update(self, request, *args, **kwargs):
+        """
+        Updates an existing board (PUT/PATCH) and utilizes a custom response 
+        serializer to ensure the returned data strictly matches frontend requirements.
+        """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        
+
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -87,6 +98,7 @@ class BoardViewSet(viewsets.ModelViewSet):
             )
         return super().destroy(request, *args, **kwargs)
 
+
 # --- Task & Comment Management ---
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -95,44 +107,58 @@ class TaskViewSet(viewsets.ModelViewSet):
     Integrates board-level permission checks to ensure data security.
     """
     serializer_class = KanbanTaskSerializer
-    # Added IsBoardMember to enforce access control based on board membership
     permission_classes = [permissions.IsAuthenticated, IsBoardMember]
     queryset = KanbanTask.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        """
+        Intercepts the creation process to manually validate board existence.
+        Immediately raises a 404 Not Found if the board ID is invalid, 
+        preventing the default 400 Bad Request from the serializer.
+        """
+        board_id = request.data.get('board') or request.data.get('parent_board')
+
+        if board_id is not None:
+            # Handle edge cases where the ID might be wrapped in a list (e.g., [4000])
+            if isinstance(board_id, list):
+                board_id = board_id[0]
+
+            # Bulletproof check: Does a board with this ID actually exist?
+            if not ProjectBoard.objects.filter(id=board_id).exists():
+                # Raise a 404 immediately before serializer validation occurs
+                raise Http404("This board does not exist.")
+
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         """
         Ensures the parent_board is correctly linked and validates user membership.
         Throws 403 Forbidden if the user is not a participant or creator of the board.
         """
-        board_id = self.request.data.get('parent_board') or self.request.data.get('board')
+        board = serializer.validated_data.get('parent_board')
 
-        if board_id:
-            board = get_object_or_404(ProjectBoard, id=board_id)
-            
-            # Explicit membership check to trigger 403 Forbidden for unauthorized users
+        if board:
             if self.request.user != board.creator and self.request.user not in board.participants.all():
-                raise PermissionDenied("You do not have permission to create tasks in this board.")
-                
-            serializer.save(parent_board=board)
-        else:
-            serializer.save()
+                raise PermissionDenied(
+                    "You do not have permission to create tasks in this board.")
+
+        serializer.save()
 
     def perform_update(self, serializer):
         """
         Validates that the parent_board cannot be changed during an update.
         Ensures consistency of task-to-board relationships.
         """
-        # Check if a board ID was provided in the request
         new_board_id = self.request.data.get('parent_board') or self.request.data.get('board')
-        
+
         if new_board_id is not None:
             instance = self.get_object()
-            # Compare requested board ID with the current board ID in the database
+
             if int(new_board_id) != instance.parent_board.id:
                 raise ValidationError({
                     "board": "Changing the board ID is not allowed!"
                 })
-        
+
         serializer.save()
 
     @action(detail=False, methods=['get'], url_path='assigned-to-me')
@@ -200,8 +226,10 @@ class TaskViewSet(viewsets.ModelViewSet):
             )
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+
 # --- Utility Views ---
+
 class EmailCheckView(APIView):
     """
     Endpoint to validate existing users via email for task assignments.
@@ -209,9 +237,12 @@ class EmailCheckView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        """
+        Retrieves a user by email and returns their basic profile data.
+        Returns 404 if the email does not correspond to an existing user.
+        """
         email = request.query_params.get('email')
         if not email:
-            # Die Dokumentation nutzt oft "detail" statt "error" bei Standard-DRF-Fehlern
             return Response({"detail": "Email missing."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -219,9 +250,8 @@ class EmailCheckView(APIView):
             return Response({
                 "id": u.id,
                 "email": u.email,
-                # Wir nutzen hier die gleiche Logik wie in deinem UserMinimalSerializer
                 "fullname": f"{u.first_name} {u.last_name}".strip() or u.username
             }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            # Wichtig für den 404-Nachweis in deiner Doku
+            # Crucial for the 404 requirement in the API documentation
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
